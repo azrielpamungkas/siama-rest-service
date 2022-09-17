@@ -56,7 +56,7 @@ class LeaveView(CreateAPIView):
             res["history"][month_year].append(
                 {
                     "type": (lambda x: "Sakit" if x else "Ijin")(q.leave_type),
-                    "img" : q.attachment.url,
+                    "img" : (lambda img: img.url if img else None)(q.attachment),
                     "mode": (lambda x: "Full Day" if x else "Half Day")(q.leave_mode),
                     "reason": q.reason,
                     "status": (
