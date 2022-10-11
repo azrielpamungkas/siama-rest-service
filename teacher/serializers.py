@@ -58,9 +58,10 @@ class TeacherClassroomDetailSerializer(serializers.ModelSerializer):
                     .filter(student__first_name=student)
                     .exists()
                 ):
+#  PR 
                     status = (
                         models.ClassroomAttendance.objects.filter(timetable=timetable)
-                        .get(student__first_name=student)
+                        .filter(student__first_name=student).first()
                         .status
                     )
                 else:
