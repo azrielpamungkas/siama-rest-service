@@ -32,7 +32,7 @@ def staff_activity(request):
 
     for day in range(datenow.min.day, datenow.max.day):
         if obj.filter(timetable__date__day=day).exists():
-            attendance = obj.get(timetable__date__day=day)
+            attendance = obj.filter(timetable__date__day=day).first()
             history = {
                 "day": day,
                 "clock_in": (lambda x: x.strftime("%H:%M:%S") if x is not None else "-")(attendance.clock_in),
