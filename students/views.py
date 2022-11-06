@@ -110,34 +110,20 @@ class StudentStatistic(APIView):
     permission_classes = [StudentOnly]
 
     def get(self, request):
-        timetable_cnt = ClassroomTimetable.objects.filter(
-            date__lte=auto_now("today")
-        ).count()
-        attendance_qry = ClassroomAttendance.objects.filter(
-            student=request.user.id
-        ).filter(timetable__date__lte=auto_now("today"))
-        try:
-            res = {
-                "leave": attendance_qry.filter(status="IJIN").count()
-                / attendance_qry.count(),
-                "absent": attendance_qry.filter(status="ALPHA").count()
-                / attendance_qry.count(),
-                "presence": attendance_qry.filter(status="HADIR").count()
-                / attendance_qry.count(),
-                "sick": attendance_qry.filter(status="SAKIT").count()
-                / attendance_qry.count(),
-                "indicator": (
-                    lambda x: "Aman" if x > 0.8 else ("Rawan" if x > 0.7 else "Bahaya")
-                )(attendance_qry.filter(status="HADIR").count()),
-            }
-        except:
-            res = {
-                "leave": 0,
-                "absent": 0,
-                "presence": 1,
-                "sick": 0,
-                "indicator": "Belum Ada Data",
-            }
+        total = AttendanceTimetable.objects.all().count()
+        attendance_query = Attendance.objects.filter(user=request.user.id, timetable__date__lte=datetime.date.today())
+        res = {
+            "leave": attendance_query.filter(status="I").count() / total,
+            "absent": attendance_query.filter(status="A").count() / total,
+            "presence": (attendance_query.filter(status="H").count() + attendance_query.filter(status="T").count()) / total,
+            "sick": attendance_query.filter(status="S").count() / total,
+        }
+        if res['presence'] > 0.8:
+            res['indicator'] = "Aman"
+        elif res['presence'] > 0.6:
+            res['indicator'] = "Perlu ditingkatkan"
+        else:
+            res['indicator'] = "Bahaya"
         return Response(res)
 
 

@@ -3,19 +3,49 @@ from rest_framework.generics import CreateAPIView
 
 from apps.classrooms.models import ClassroomTimetable
 from . import serializers
-from utils.gps import detector, validation
+from utils.gps import detector
 from .models import Attendance, AttendanceTimetable, Leave
 from rest_framework.response import Response
-from django.core.exceptions import PermissionDenied
 import datetime
 from django.contrib.auth.models import User
-from drf_yasg.utils import swagger_auto_schema
-from rest_framework.parsers import MultiPartParser, FormParser
-from .docs import AttendanceDoc
+from rest_framework.decorators import api_view
 
-doc = AttendanceDoc()
+@api_view(["GET"])
+def activity(request):
+    res = []
+    date = datetime.datetime.now().date()
+    year = date.year
+    month = date.month
 
-# /v1/teacher/?geo=${user.latitude},${user.longitude}
+    obj = Attendance.objects.filter(user=request.user.id).filter(
+        timetable__date__year__gte=year,
+        timetable__date__month__gte=month,
+        timetable__date__year__lte=year,
+        timetable__date__month__lte=month,
+    )
+
+    for day in range(date.min.day, date.max.day):
+        if obj.filter(timetable__date__day=day).exists():
+            attendance = obj.get(timetable__date__day=day)
+            history = {
+                "day": day,
+                "clock_in": (
+                    lambda x: x.strftime("%H:%M:%S") if x is not None else "-"
+                )(attendance.clock_in),
+                "clock_out": (
+                    lambda x: x.strftime("%H:%M:%S") if x is not None else "-"
+                )(attendance.clock_out),
+                "status": attendance.status,
+            }
+        else:
+            history = {
+                "day": day,
+                "clock_in": "-",
+                "clock_out": "-",
+                "status": "off",
+            }
+        res.append(history)
+    return Response(res)
 
 
 class LeaveView(CreateAPIView):
@@ -34,7 +64,7 @@ class LeaveView(CreateAPIView):
         else:
             role = "KRY"
 
-        attendance_timetable_q = AttendanceTimetable.objects.filter(role=role)
+        attendance_timetable_q = AttendanceTimetable.objects.filter(date__gte=datetime.date.today(),role=role)
         res = {
             "history": {},
             "attendanceTimetable": [
@@ -56,7 +86,7 @@ class LeaveView(CreateAPIView):
             res["history"][month_year].append(
                 {
                     "type": (lambda x: "Sakit" if x else "Ijin")(q.leave_type),
-                    "img" : (lambda img: img.url if img else None)(q.attachment),
+                    "img": (lambda img: img.url if img else None)(q.attachment),
                     "mode": (lambda x: "Full Day" if x else "Half Day")(q.leave_mode),
                     "reason": q.reason,
                     "status": (
@@ -88,6 +118,50 @@ class LeaveView(CreateAPIView):
         else:
             leave_mode = 1
         serializer.save(user=self.request.user, leave_mode=leave_mode)
+
+
+@api_view(['GET'])
+def attendance_view(request):
+    roles = {"teacher": "GRU", "student": "MRD", "staff": "KWN"}
+    timetable = AttendanceTimetable.objects.get(date=datetime.date.today(),
+                                                role=roles[request.user.groups. filter().first().name]
+                                                )
+    if request.method == "GET":
+        histories = Attendance.objects.filter(user=request.user.id)[:4]
+        history_dump = []
+        for history in histories:
+            if history.clock_in is not None:
+                history_dump.append({'type': 'clock in', 'time': history.clock_in.strftime("%H:%M")})
+            if history.clock_out is not None:
+                history_dump.append({'type': 'clock out', 'time': history.clock_out.strftime("%H:%M")})
+        attendance = Attendance.objects.all().first()
+        clock_in = None
+        clock_out = None
+        if attendance is not None:
+            if attendance.clock_out is None:
+                clock_out = True
+            else:
+                clock_in = False
+                clock_out= False
+        else:
+            clock_in = True
+
+        return Response({
+                "greeting": "Selamat Pagi",
+                "work_time": timetable.work_time,
+                "home_time" : timetable.home_time,
+                "user": {
+                    "first_name": request.user.first_name,
+                    "last_name": request.user.last_name,
+                },
+                "recent_activity": history_dump,
+                "status_button": {
+                    "clockIn": clock_in,
+                    "clockOut": clock_out
+                },
+                "message": ""
+            })
+
 
 
 class AttendanceView(APIView):

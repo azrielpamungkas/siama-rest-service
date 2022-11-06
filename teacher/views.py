@@ -46,46 +46,6 @@ class TeacherClassroomDetail(generics.RetrieveAPIView):
     lookup_field = "pk"
     permission_classes = [TeacherOnly]
 
-
-@api_view(["GET"])
-@permission_classes([TeacherOnly])
-def teacher_activity(request):
-    res = []
-    datenow = datetime.datetime.now().date()
-    year = datenow.year
-    month = datenow.month
-
-    obj = Attendance.objects.filter(user=request.user.id).filter(
-        timetable__date__year__gte=year,
-        timetable__date__month__gte=month,
-        timetable__date__year__lte=year,
-        timetable__date__month__lte=month,
-    )
-
-    for day in range(datenow.min.day, datenow.max.day):
-        if obj.filter(timetable__date__day=day).exists():
-            attendance = obj.get(timetable__date__day=day)
-            history = {
-                "day": day,
-                "clock_in": (
-                    lambda x: x.strftime("%H:%M:%S") if x is not None else "-"
-                )(attendance.clock_in),
-                "clock_out": (
-                    lambda x: x.strftime("%H:%M:%S") if x is not None else "-"
-                )(attendance.clock_out),
-                "status": attendance.status,
-            }
-        else:
-            history = {
-                "day": day,
-                "clock_in": "-",
-                "clock_out": "-",
-                "status": "off",
-            }
-        res.append(history)
-    return Response(res)
-
-
 @api_view(["GET"])
 @permission_classes([TeacherOnly])
 def teacher_journal_list(request):
